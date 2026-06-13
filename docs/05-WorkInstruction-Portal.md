@@ -290,6 +290,16 @@ Once the operation completes, verify the APIM overview shows the new VIP address
 
 ---
 
+## Step 13: Verify Scaling is Now Available
+
+After migration to the larger subnet, confirm that APIM can now scale beyond the previous limit. Navigate to **Monitoring → Scale out (auto-scale)**:
+
+![Scale Out After Migration](images/14-scale-out-after-migration.png)
+
+> ✅ **The instance count can now be increased to 10 (or more)** — this was previously blocked by the `/28` subnet running out of IP addresses. The larger `/25` subnet provides 123 usable IPs, sufficient for scaling well beyond 10 units.
+
+---
+
 ## Post-Migration Actions
 
 After successful migration, complete these steps:
