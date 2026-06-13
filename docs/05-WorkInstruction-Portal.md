@@ -185,6 +185,56 @@ az network nsg rule create \
 
 > ⚠️ **Note:** All Allow rules must have a priority **lower than 999** to be evaluated before the `Deny_All_Internet_Outbound` rule.
 
+### NSG Rules Reference by APIM VNet Mode
+
+Depending on your APIM VNet mode, refer to the appropriate Microsoft documentation for the full list of required NSG rules:
+
+| VNet Mode | Documentation |
+|-----------|---------------|
+| **External** | [Configure NSG rules — External VNet](https://learn.microsoft.com/en-us/azure/api-management/api-management-using-with-vnet#configure-nsg-rules) |
+| **Internal** | [Configure NSG rules — Internal VNet](https://learn.microsoft.com/en-us/azure/api-management/api-management-using-with-internal-vnet#configure-nsg-rules) |
+
+### Required NSG Rules — Internal APIM (stv2)
+
+| Direction | Priority | Source | Destination | Port(s) | Protocol | Purpose |
+|-----------|----------|--------|-------------|---------|----------|---------|
+| Inbound | 100 | ApiManagement | VirtualNetwork | 3443 | TCP | Management endpoint |
+| Inbound | 110 | AzureLoadBalancer | VirtualNetwork | 6390 | TCP | Azure Infrastructure Load Balancer |
+| Inbound | 120 | AzureTrafficManager | VirtualNetwork | 443 | TCP | Azure Traffic Manager routing (Multi-region) |
+| Inbound | 130 | VirtualNetwork | VirtualNetwork | 443 | TCP | Client communication to APIM |
+| Inbound | 140 | VirtualNetwork | VirtualNetwork | 3443 | TCP | Access to Azure Portal diagnostic extension |
+| Outbound | 100 | VirtualNetwork | Storage | 443 | TCP | Dependency on Azure Storage |
+| Outbound | 110 | VirtualNetwork | Sql | 1433 | TCP | Access to Azure SQL endpoints |
+| Outbound | 120 | VirtualNetwork | AzureKeyVault | 443 | TCP | Access to Azure Key Vault |
+| Outbound | 130 | VirtualNetwork | AzureMonitor | 1886, 443 | TCP | Publish diagnostics Logs and Metrics |
+| Outbound | 140 | VirtualNetwork | AzureActiveDirectory | 443 | TCP | Azure AD authentication |
+| Outbound | 150 | VirtualNetwork | EventHub | 5671, 5672, 443 | TCP | Log to Event Hub policy |
+| Outbound | 160 | VirtualNetwork | AzureCloud | 443, 12000 | TCP | Health and Monitoring Extension |
+| Outbound | 170 | VirtualNetwork | Internet | 80 | TCP | Certificate validation (CRL, OCSP, AIA) |
+| Outbound | 180 | VirtualNetwork | Internet | 25, 587, 25028 | TCP | SMTP Relay for sending emails |
+| Outbound | 999 | VirtualNetwork | Internet | * | Any | **Deny All** (security policy) |
+
+### Required NSG Rules — External APIM (stv2)
+
+| Direction | Priority | Source | Destination | Port(s) | Protocol | Purpose |
+|-----------|----------|--------|-------------|---------|----------|---------|
+| Inbound | 100 | Internet | VirtualNetwork | 80, 443 | TCP | Client communication to APIM |
+| Inbound | 110 | ApiManagement | VirtualNetwork | 3443 | TCP | Management endpoint |
+| Inbound | 120 | AzureLoadBalancer | VirtualNetwork | 6390 | TCP | Azure Infrastructure Load Balancer |
+| Inbound | 130 | AzureTrafficManager | VirtualNetwork | 443 | TCP | Azure Traffic Manager routing (Multi-region) |
+| Outbound | 100 | VirtualNetwork | Storage | 443 | TCP | Dependency on Azure Storage |
+| Outbound | 110 | VirtualNetwork | Sql | 1433 | TCP | Access to Azure SQL endpoints |
+| Outbound | 120 | VirtualNetwork | AzureKeyVault | 443 | TCP | Access to Azure Key Vault |
+| Outbound | 130 | VirtualNetwork | AzureMonitor | 1886, 443 | TCP | Publish diagnostics Logs and Metrics |
+| Outbound | 140 | VirtualNetwork | AzureActiveDirectory | 443 | TCP | Azure AD authentication |
+| Outbound | 150 | VirtualNetwork | EventHub | 5671, 5672, 443 | TCP | Log to Event Hub policy |
+| Outbound | 160 | VirtualNetwork | AzureCloud | 443, 12000 | TCP | Health and Monitoring Extension |
+| Outbound | 170 | VirtualNetwork | Internet | 80 | TCP | Certificate validation (CRL, OCSP, AIA) |
+| Outbound | 180 | VirtualNetwork | Internet | 25, 587, 25028 | TCP | SMTP Relay for sending emails |
+| Outbound | 999 | VirtualNetwork | Internet | * | Any | **Deny All** (security policy) |
+
+> **Key difference:** External mode requires **Inbound Internet on ports 80, 443** for public client access, while Internal mode only allows inbound from **VirtualNetwork**.
+
 ---
 
 ## Step 8: Confirm Service Endpoints Are Added
