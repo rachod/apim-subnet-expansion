@@ -254,15 +254,37 @@ The APIM network page shows the new subnet (`snet-large`) is now configured.
 
 ## Step 12: Verify Migration Complete
 
-Once the operation completes, verify the APIM overview shows the new private IP on the larger subnet:
+Once the operation completes, verify the APIM overview shows the new VIP addresses on the larger subnet.
 
-![APIM Overview Migrated](images/11-apim-overview-migrated.png)
+### Before Migration (on `/28` subnet)
 
-**Confirmed:**
-- Status: **Online**
-- Tier: **Premium**
-- VIP: Public `20.247.169.231`, Private `10.2.0.4` (new subnet IP)
-- Location: Southeast Asia
+![APIM Overview Before](images/11-apim-overview-migrated.png)
+
+| Field | Value |
+|-------|-------|
+| Status | Online |
+| Tier | Premium |
+| Public VIP | `x.x.x.x` |
+| Private VIP | `10.2.0.4` |
+| Subnet | `snet-small` (/28) |
+
+### After Migration (on `/25` subnet)
+
+![APIM Overview After](images/13-migration-complete-overview.png)
+
+| Field | Value |
+|-------|-------|
+| Status | Online |
+| Tier | Premium |
+| Public VIP | `x.x.x.x` (changed) |
+| Private VIP | `10.2.1.4` (changed) |
+| Subnet | `snet-large` (/25) |
+
+> ⚠️ **Important: Both public and private IP addresses change after subnet migration.**
+> - Update **Private DNS zone** to point to the new private IP
+> - Update **Application Gateway** backend pool with new private IP
+> - Update **Firewall rules** to allow traffic to/from new subnet range
+> - Notify downstream consumers if they reference the public VIP directly
 
 ---
 
