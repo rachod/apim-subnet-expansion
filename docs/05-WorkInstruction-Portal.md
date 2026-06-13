@@ -137,53 +137,7 @@ The verifier may show failed security rule requirements:
 | ❌ Critical | Outbound | Internet | 80 | HTTPS certificate validation (CRL, OCSP, AIA) |
 | ⚠️ Warning | Outbound | Internet | Any | Rule 999 Deny_All_Internet_Outbound is blocking |
 
-**Fix — Add missing NSG rules (priority must be lower than Deny rule at 999):**
-
-```bash
-# Allow Event Hub outbound
-az network nsg rule create \
-  --resource-group $RG \
-  --nsg-name $NSG_NAME \
-  --name Allow-EventHub-Outbound \
-  --priority 150 \
-  --direction Outbound \
-  --access Allow \
-  --protocol Tcp \
-  --source-address-prefixes VirtualNetwork \
-  --source-port-ranges '*' \
-  --destination-address-prefixes EventHub \
-  --destination-port-ranges '5671 5672 443'
-
-# Allow AzureCloud outbound (Health and Monitoring)
-az network nsg rule create \
-  --resource-group $RG \
-  --nsg-name $NSG_NAME \
-  --name Allow-AzureCloud-Outbound \
-  --priority 160 \
-  --direction Outbound \
-  --access Allow \
-  --protocol Tcp \
-  --source-address-prefixes VirtualNetwork \
-  --source-port-ranges '*' \
-  --destination-address-prefixes AzureCloud \
-  --destination-port-ranges '443 12000'
-
-# Allow CRL/OCSP outbound (certificate validation, port 80)
-az network nsg rule create \
-  --resource-group $RG \
-  --nsg-name $NSG_NAME \
-  --name Allow-CRL-Outbound \
-  --priority 170 \
-  --direction Outbound \
-  --access Allow \
-  --protocol Tcp \
-  --source-address-prefixes VirtualNetwork \
-  --source-port-ranges '*' \
-  --destination-address-prefixes Internet \
-  --destination-port-ranges '80'
-```
-
-> ⚠️ **Note:** All Allow rules must have a priority **lower than 999** to be evaluated before the `Deny_All_Internet_Outbound` rule.
+> ⚠️ **Note:** All Allow rules must have a priority **lower than 999** to be evaluated before the `Deny_All_Internet_Outbound` rule. Refer to the NSG rules tables below for the complete list.
 
 ### NSG Rules Reference by APIM VNet Mode
 
