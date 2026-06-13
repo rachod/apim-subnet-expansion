@@ -266,19 +266,6 @@ Once the operation completes, verify the APIM overview shows the new private IP 
 
 ---
 
-## Step 13: Confirm New IP Addresses
-
-After migration completes, navigate to the APIM **Overview** page to confirm the new Virtual IP (VIP) addresses:
-
-![Migration Complete Overview](images/13-migration-complete-overview.png)
-
-> ⚠️ **Important: IP addresses change after subnet migration.**
-> - The **public VIP** and **private VIP** will both be assigned new addresses from the new subnet.
-> - Update all dependent systems (DNS, Application Gateway backend pools, firewall rules, client configurations) with the new IPs.
-> - In this example, the last octet of the public IP changed to `.137` and the private IP changed to `10.2.1.4`.
-
----
-
 ## Post-Migration Actions
 
 After successful migration, complete these steps:
