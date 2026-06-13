@@ -307,15 +307,4 @@ az apim show --resource-group $RG --name $APIM_NAME \
 
 ---
 
-## Summary of Issues and Fixes
-
-| Issue | Root Cause | Fix |
-|-------|-----------|-----|
-| NSG Security Rules ❌ Critical | NSG not attached to new subnet | `az network vnet subnet update --network-security-group` |
-| Service Endpoints ❌ Critical | Service endpoints not enabled | `az network vnet subnet update --service-endpoints` |
-| Deny_All_Internet ⚠️ Warning | Deny rule blocks APIM outbound | Add Allow rules with priority < 999 |
-| CRL/OCSP ❌ Critical | Port 80 outbound blocked | Add Allow rule for Internet port 80 |
-
----
-
 > [↑ Back to README](../README.md)
