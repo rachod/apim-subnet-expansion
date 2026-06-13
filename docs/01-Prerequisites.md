@@ -148,7 +148,96 @@ az network nsg rule create \
   --source-port-ranges '*' \
   --destination-address-prefixes AzureKeyVault \
   --destination-port-ranges 443
+
+# Allow Azure Monitor (metrics, diagnostics, logging)
+az network nsg rule create \
+  --resource-group $RG \
+  --nsg-name $NSG_NAME \
+  --name Allow-AzureMonitor-Outbound \
+  --priority 130 \
+  --direction Outbound \
+  --access Allow \
+  --protocol Tcp \
+  --source-address-prefixes VirtualNetwork \
+  --source-port-ranges '*' \
+  --destination-address-prefixes AzureMonitor \
+  --destination-port-ranges '1886 443'
+
+# Allow Azure Active Directory
+az network nsg rule create \
+  --resource-group $RG \
+  --nsg-name $NSG_NAME \
+  --name Allow-AzureAD-Outbound \
+  --priority 140 \
+  --direction Outbound \
+  --access Allow \
+  --protocol Tcp \
+  --source-address-prefixes VirtualNetwork \
+  --source-port-ranges '*' \
+  --destination-address-prefixes AzureActiveDirectory \
+  --destination-port-ranges 443
+
+# Allow Azure Event Hub (for logging)
+az network nsg rule create \
+  --resource-group $RG \
+  --nsg-name $NSG_NAME \
+  --name Allow-EventHub-Outbound \
+  --priority 150 \
+  --direction Outbound \
+  --access Allow \
+  --protocol Tcp \
+  --source-address-prefixes VirtualNetwork \
+  --source-port-ranges '*' \
+  --destination-address-prefixes EventHub \
+  --destination-port-ranges '5671 5672 443'
+
+# Allow SMTP Relay (for email notifications, optional)
+az network nsg rule create \
+  --resource-group $RG \
+  --nsg-name $NSG_NAME \
+  --name Allow-SMTP-Outbound \
+  --priority 160 \
+  --direction Outbound \
+  --access Allow \
+  --protocol Tcp \
+  --source-address-prefixes VirtualNetwork \
+  --source-port-ranges '*' \
+  --destination-address-prefixes Internet \
+  --destination-port-ranges '25 587 25028'
 ```
+
+> ⚠️ **IMPORTANT: If your NSG has a "Deny All Internet Outbound" rule**, all Allow rules above **must have a lower priority number** (higher priority) than the Deny rule. For example, if your Deny rule is at priority 999, ensure all APIM Allow rules are at priorities 100-998.
+
+**Example — Deny All Internet Outbound rule (commonly applied by security teams):**
+
+```bash
+# This is the rule that blocks APIM if Allow rules are not added above it:
+# Rule: 999  Deny_All_Internet_Outbound  Outbound  Deny  *  Internet
+
+# Verify your Deny rule priority:
+az network nsg rule show \
+  --resource-group $RG \
+  --nsg-name $NSG_NAME \
+  --name Deny_All_Internet_Outbound \
+  --query "{name:name, priority:priority, access:access, direction:direction}" \
+  -o table
+
+# All Allow rules must have priority < 999 (lower number = evaluated first)
+# Our rules use priorities 100-160, so they are processed BEFORE the deny rule.
+```
+
+**Full list of required APIM outbound dependencies:**
+
+| Priority | Rule Name | Destination Service Tag | Ports | Required |
+|----------|-----------|------------------------|-------|----------|
+| 100 | Allow-Storage-Outbound | `Storage` | 443 | ✅ Yes |
+| 110 | Allow-SQL-Outbound | `Sql` | 1433 | ✅ Yes |
+| 120 | Allow-KeyVault-Outbound | `AzureKeyVault` | 443 | ✅ Yes |
+| 130 | Allow-AzureMonitor-Outbound | `AzureMonitor` | 1886, 443 | ✅ Yes |
+| 140 | Allow-AzureAD-Outbound | `AzureActiveDirectory` | 443 | ✅ Yes |
+| 150 | Allow-EventHub-Outbound | `EventHub` | 5671, 5672, 443 | ⚠️ If logging enabled |
+| 160 | Allow-SMTP-Outbound | `Internet` | 25, 587, 25028 | ⚠️ If email enabled |
+| 999 | Deny_All_Internet_Outbound | `Internet` | * | 🔒 Security policy |
 
 ---
 

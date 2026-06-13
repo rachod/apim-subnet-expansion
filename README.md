@@ -61,8 +61,9 @@ Azure API Management (Premium, Internal VNet mode) deployed in a constrained sub
 |---|----------|-------------|
 | 1 | [Prerequisites](docs/01-Prerequisites.md) | Requirements, environment setup, NSG and VNet creation |
 | 2 | [Backup Configuration](docs/03-BackupConfiguration.md) | Backup APIM configuration before migration |
-| 3 | [Subnet Migration](docs/04-SubnetMigration.md) | Migrate APIM to a larger subnet and verify |
-| 4 | [Pre-Migration Checklist](docs/06-PreMigrationChecklist.md) | Production checklist with az commands per step |
+| 3 | [Subnet Migration](docs/04-SubnetMigration.md) | Migrate APIM to a larger subnet (CLI) with pre-flight checks |
+| 4 | [Work Instruction — Portal](docs/05-WorkInstruction-Portal.md) | Step-by-step portal guide with screenshots |
+| 5 | [Pre-Migration Checklist](docs/06-PreMigrationChecklist.md) | Production checklist with az commands per step |
 
 ---
 

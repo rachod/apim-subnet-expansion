@@ -8,6 +8,208 @@
 
 ---
 
+## Pre-Migration Validation
+
+Run these checks to confirm all prerequisites are met before starting the migration:
+
+```bash
+echo "============================================================"
+echo " APIM Subnet Migration - Pre-Flight Checks"
+echo "============================================================"
+echo ""
+
+PASS=0
+FAIL=0
+
+# --- Check 1: APIM is in Succeeded state ---
+echo "1. Checking APIM provisioning state..."
+APIM_STATE=$(az apim show --resource-group $RG --name $APIM_NAME \
+  --query provisioningState -o tsv 2>/dev/null)
+if [ "$APIM_STATE" = "Succeeded" ]; then
+  echo "   ✅ APIM state: $APIM_STATE"
+  PASS=$((PASS+1))
+else
+  echo "   ❌ APIM state: $APIM_STATE (must be 'Succeeded' before migration)"
+  FAIL=$((FAIL+1))
+fi
+
+echo ""
+
+# --- Check 2: APIM is Premium SKU ---
+echo "2. Checking APIM SKU..."
+APIM_SKU=$(az apim show --resource-group $RG --name $APIM_NAME \
+  --query sku.name -o tsv 2>/dev/null)
+if [ "$APIM_SKU" = "Premium" ]; then
+  echo "   ✅ SKU: $APIM_SKU"
+  PASS=$((PASS+1))
+else
+  echo "   ❌ SKU: $APIM_SKU (VNet integration requires Premium)"
+  FAIL=$((FAIL+1))
+fi
+
+echo ""
+
+# --- Check 3: APIM is on stv2 platform ---
+echo "3. Checking APIM platform version..."
+PLATFORM=$(az apim show --resource-group $RG --name $APIM_NAME \
+  --query platformVersion -o tsv 2>/dev/null)
+if [ "$PLATFORM" = "stv2" ]; then
+  echo "   ✅ Platform: $PLATFORM"
+  PASS=$((PASS+1))
+else
+  echo "   ❌ Platform: $PLATFORM (stv1 must be migrated to stv2 first)"
+  FAIL=$((FAIL+1))
+fi
+
+echo ""
+
+# --- Check 4: Target subnet exists ---
+echo "4. Checking target subnet exists..."
+SUBNET_EXISTS=$(az network vnet subnet show --resource-group $RG \
+  --vnet-name $VNET_NAME --name $SUBNET_LARGE \
+  --query name -o tsv 2>/dev/null)
+if [ "$SUBNET_EXISTS" = "$SUBNET_LARGE" ]; then
+  echo "   ✅ Subnet found: $SUBNET_LARGE"
+  PASS=$((PASS+1))
+else
+  echo "   ❌ Subnet '$SUBNET_LARGE' not found in VNet '$VNET_NAME'"
+  FAIL=$((FAIL+1))
+fi
+
+echo ""
+
+# --- Check 5: Target subnet has enough IPs ---
+echo "5. Checking target subnet size..."
+SUBNET_PREFIX=$(az network vnet subnet show --resource-group $RG \
+  --vnet-name $VNET_NAME --name $SUBNET_LARGE \
+  --query addressPrefix -o tsv 2>/dev/null)
+CIDR=$(echo $SUBNET_PREFIX | cut -d'/' -f2)
+TOTAL_IPS=$((2 ** (32 - CIDR)))
+USABLE_IPS=$((TOTAL_IPS - 5))
+CURRENT_CAPACITY=$(az apim show --resource-group $RG --name $APIM_NAME \
+  --query sku.capacity -o tsv 2>/dev/null)
+IPS_NEEDED=$(( (CURRENT_CAPACITY * 2) + 1 ))
+
+if [ "$USABLE_IPS" -ge "$IPS_NEEDED" ]; then
+  echo "   ✅ Subnet $SUBNET_PREFIX has $USABLE_IPS usable IPs (need $IPS_NEEDED for $CURRENT_CAPACITY units)"
+  PASS=$((PASS+1))
+else
+  echo "   ❌ Subnet $SUBNET_PREFIX has only $USABLE_IPS usable IPs (need $IPS_NEEDED for $CURRENT_CAPACITY units)"
+  FAIL=$((FAIL+1))
+fi
+
+echo ""
+
+# --- Check 6: Target subnet is empty (no existing resources) ---
+echo "6. Checking target subnet is empty..."
+EXISTING_IPS=$(az network vnet subnet show --resource-group $RG \
+  --vnet-name $VNET_NAME --name $SUBNET_LARGE \
+  --query "length(ipConfigurations || \`[]\`)" -o tsv 2>/dev/null)
+if [ "$EXISTING_IPS" = "0" ] || [ -z "$EXISTING_IPS" ]; then
+  echo "   ✅ Subnet is empty (no existing IP allocations)"
+  PASS=$((PASS+1))
+else
+  echo "   ⚠️  Subnet has $EXISTING_IPS existing IP allocations (may reduce available capacity)"
+  PASS=$((PASS+1))
+fi
+
+echo ""
+
+# --- Check 7: NSG is attached to target subnet ---
+echo "7. Checking NSG on target subnet..."
+SUBNET_NSG=$(az network vnet subnet show --resource-group $RG \
+  --vnet-name $VNET_NAME --name $SUBNET_LARGE \
+  --query "networkSecurityGroup.id" -o tsv 2>/dev/null)
+if [ -n "$SUBNET_NSG" ] && [ "$SUBNET_NSG" != "None" ]; then
+  NSG_SHORT=$(echo $SUBNET_NSG | awk -F'/' '{print $NF}')
+  echo "   ✅ NSG attached: $NSG_SHORT"
+  PASS=$((PASS+1))
+else
+  echo "   ❌ No NSG attached to target subnet (APIM requires NSG with port 3443)"
+  FAIL=$((FAIL+1))
+fi
+
+echo ""
+
+# --- Check 8: NSG has required APIM management rule (port 3443) ---
+echo "8. Checking NSG has APIM management rule (port 3443)..."
+if [ -n "$NSG_SHORT" ]; then
+  RULE_3443=$(az network nsg rule list --resource-group $RG --nsg-name $NSG_SHORT \
+    --query "[?destinationPortRanges[?contains(@,'3443')] || destinationPortRange=='3443'].name" \
+    -o tsv 2>/dev/null)
+  if [ -n "$RULE_3443" ]; then
+    echo "   ✅ Port 3443 rule found: $RULE_3443"
+    PASS=$((PASS+1))
+  else
+    echo "   ❌ No inbound rule for port 3443 (required for APIM management)"
+    FAIL=$((FAIL+1))
+  fi
+else
+  echo "   ❌ Cannot check - no NSG attached"
+  FAIL=$((FAIL+1))
+fi
+
+echo ""
+
+# --- Check 9: Target subnet is in same VNet as current ---
+echo "9. Checking target subnet is in same VNet..."
+CURRENT_SUBNET=$(az apim show --resource-group $RG --name $APIM_NAME \
+  --query virtualNetworkConfiguration.subnetResourceId -o tsv 2>/dev/null)
+CURRENT_VNET=$(echo $CURRENT_SUBNET | awk -F'/subnets/' '{print $1}')
+TARGET_VNET="/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/$VNET_NAME"
+
+if echo "$CURRENT_VNET" | grep -qi "$VNET_NAME"; then
+  echo "   ✅ Same VNet: $VNET_NAME"
+  PASS=$((PASS+1))
+else
+  echo "   ❌ Different VNet detected. Migration requires same VNet."
+  FAIL=$((FAIL+1))
+fi
+
+echo ""
+
+# --- Check 10: Backup exists ---
+echo "10. Checking APIM backup exists..."
+if [ -n "$BACKUP_STORAGE_ACCOUNT" ]; then
+  BLOB_COUNT=$(az storage blob list --container-name $BACKUP_CONTAINER \
+    --account-name $BACKUP_STORAGE_ACCOUNT --auth-mode login \
+    --query "length([?contains(name,'apim-backup')])" -o tsv 2>/dev/null)
+  if [ "$BLOB_COUNT" -gt 0 ] 2>/dev/null; then
+    echo "   ✅ Backup found ($BLOB_COUNT backup blob(s) in storage)"
+    PASS=$((PASS+1))
+  else
+    echo "   ❌ No backup found. Run backup before migration (see 03-BackupConfiguration.md)"
+    FAIL=$((FAIL+1))
+  fi
+else
+  echo "   ⚠️  BACKUP_STORAGE_ACCOUNT not set - cannot verify backup"
+  FAIL=$((FAIL+1))
+fi
+
+echo ""
+echo "============================================================"
+echo " PRE-FLIGHT RESULTS: $PASS passed, $FAIL failed"
+echo "============================================================"
+
+if [ "$FAIL" -gt 0 ]; then
+  echo ""
+  echo " ❌ DO NOT PROCEED - Fix the failed checks above before migrating."
+  echo ""
+else
+  echo ""
+  echo " ✅ ALL CHECKS PASSED - Safe to proceed with migration."
+  echo ""
+fi
+```
+
+> **Note:** If any check fails, resolve the issue before proceeding. Common fixes:
+> - **APIM not Succeeded:** Wait for any in-progress operation to complete
+> - **stv1 platform:** Migrate to stv2 first (`az apim update --set platformVersion=stv2`)
+> - **No NSG:** Attach NSG with APIM rules to the target subnet
+> - **No backup:** Run [Backup Configuration](03-BackupConfiguration.md) steps first
+
+---
+
 ## Create the New Larger Subnet
 
 ```bash
