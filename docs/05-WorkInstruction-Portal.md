@@ -70,6 +70,8 @@ The VNet Verifier checks your new subnet for APIM compatibility. If there are is
 | Network Connectivity | ✅ Healthy | Can reach Azure services |
 | NatGateway Status | ✅ Healthy | NAT gateway configured correctly |
 
+> 💡 **Tip:** If you have already fixed a configuration issue but the portal still shows the old result, click on the **Time range** dropdown and re-select the time range to refresh the verifier results.
+
 ---
 
 ## Step 5: Fix Issue — NSG Not Associated
