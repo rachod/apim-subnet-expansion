@@ -134,6 +134,91 @@ az apim show --resource-group $RG --name $APIM_NAME \
 
 ---
 
+## Export Infrastructure Configuration (Not Covered by az apim backup)
+
+The following items are **not included** in `az apim backup` and should be exported separately:
+
+```bash
+# Create infrastructure backup directory
+mkdir -p $BACKUP_DIR/{infrastructure,diagnostics,developer-portal}
+
+# --- VNet, Identity, and Protocol Settings ---
+echo "=== Exporting VNet & Identity Configuration ==="
+az apim show --resource-group $RG --name $APIM_NAME \
+  --query "{virtualNetworkType:virtualNetworkType, virtualNetworkConfiguration:virtualNetworkConfiguration, identity:identity, customProperties:customProperties, platformVersion:platformVersion, sku:sku}" \
+  -o json > $BACKUP_DIR/infrastructure/vnet-identity-config.json
+
+# --- Diagnostic Settings (Azure Monitor) ---
+echo "=== Exporting Diagnostic Settings ==="
+APIM_RESOURCE_ID=$(az apim show --resource-group $RG --name $APIM_NAME --query id -o tsv)
+az monitor diagnostic-settings list \
+  --resource "$APIM_RESOURCE_ID" \
+  -o json > $BACKUP_DIR/diagnostics/diagnostic-settings.json
+
+# --- Custom CA Certificates ---
+echo "=== Exporting CA Certificate Metadata ==="
+az apim show --resource-group $RG --name $APIM_NAME \
+  --query "certificates" -o json > $BACKUP_DIR/certificates/ca-certificates.json
+
+# --- Private Endpoint Connections ---
+echo "=== Exporting Private Endpoint Connections ==="
+az network private-endpoint-connection list \
+  --id "$APIM_RESOURCE_ID" \
+  -o json > $BACKUP_DIR/infrastructure/private-endpoints.json 2>/dev/null || true
+
+# --- NSG and Subnet (network context) ---
+echo "=== Exporting Subnet and NSG Configuration ==="
+SUBNET_ID=$(az apim show --resource-group $RG --name $APIM_NAME \
+  --query "virtualNetworkConfiguration.subnetResourceId" -o tsv)
+if [ -n "$SUBNET_ID" ]; then
+  az network vnet subnet show --ids "$SUBNET_ID" -o json > $BACKUP_DIR/infrastructure/subnet-config.json
+  NSG_ID=$(az network vnet subnet show --ids "$SUBNET_ID" --query "networkSecurityGroup.id" -o tsv)
+  if [ -n "$NSG_ID" ]; then
+    az network nsg show --ids "$NSG_ID" -o json > $BACKUP_DIR/infrastructure/nsg-rules.json
+  fi
+fi
+```
+
+### Developer Portal Content
+
+Developer portal content requires a separate export tool:
+
+```bash
+# Clone the developer portal migration script
+# Reference: https://github.com/Azure/api-management-developer-portal/tree/master/scripts.v3
+echo "=== Developer Portal ==="
+echo "⚠️  Developer portal content must be exported using the dedicated migration scripts."
+echo "    See: https://learn.microsoft.com/en-us/azure/api-management/automate-portal-deployments"
+
+# Export portal metadata (revision info)
+az rest --method get \
+  --url "https://management.azure.com${APIM_RESOURCE_ID}/portalsettings?api-version=2022-08-01" \
+  -o json > $BACKUP_DIR/developer-portal/portal-settings.json 2>/dev/null || true
+```
+
+### Coverage Summary
+
+| Item | `az apim backup` | Git-Friendly Export | Infrastructure Export |
+|------|:-:|:-:|:-:|
+| APIs, Operations, Schemas | ✅ | ✅ | — |
+| Products & Subscriptions | ✅ | ✅ | — |
+| Policies (global, API, product) | ✅ | ✅ | — |
+| Named Values | ✅ | ✅ | — |
+| Users & Groups | ✅ | — | — |
+| Usage/Analytics data | ❌ | ❌ | ❌ |
+| Custom domain TLS/SSL certs | ❌ | ⚠️ metadata | ⚠️ metadata |
+| Custom CA certificates | ❌ | ❌ | ⚠️ metadata |
+| VNet integration settings | ❌ | ❌ | ✅ |
+| Managed identity config | ❌ | ❌ | ✅ |
+| Azure Monitor diagnostics | ❌ | ❌ | ✅ |
+| Protocols & cipher settings | ❌ | ❌ | ✅ |
+| Developer portal content | ❌ | ❌ | ⚠️ separate tool |
+| Credential manager | ❌ | ❌ | ❌ |
+
+> ⚠️ **Note:** Certificate private keys and OAuth secrets **cannot** be exported. Keep original PFX files and credentials stored securely in Key Vault.
+
+---
+
 ## Verify Backup
 
 ```bash
