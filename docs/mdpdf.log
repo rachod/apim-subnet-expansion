@@ -1,0 +1,5 @@
+    INFO: 2026-06-15 09:34:56,495:               log.py:   20: Logging to /Users/rachod/Desktop/projects/ais-apim-subnet-expansion/docs/mdpdf.log
+   DEBUG: 2026-06-15 09:34:56,495:               cli.py:  103: 05-WorkInstruction-Portal.md
+    INFO: 2026-06-15 09:34:56,498:         converter.py:   14: 05-WorkInstruction-Portal.md
+   DEBUG: 2026-06-15 09:34:56,516:      pdf_renderer.py:  470: printSegment: Work Instruction: Migrate APIM to New Subnet (Portal)
+   DEBUG: 2026-06-15 09:34:56,519:      pdf_renderer.py:  470: printSegment: ↑ Back to README
