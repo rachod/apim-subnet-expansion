@@ -174,4 +174,29 @@ az apim restore \
 
 ---
 
+## What is NOT Included in Backup
+
+> ⚠️ The following items are **not captured** by `az apim backup` and must be reconfigured manually if lost:
+
+| Item | Notes |
+|------|-------|
+| **Usage/analytics data** | Use [REST API](https://learn.microsoft.com/en-us/rest/api/apimanagement/) to export analytics separately |
+| **Custom domain TLS/SSL certificates** | Must re-upload certificates after restore |
+| **Custom CA certificates** | Intermediate or root certificates uploaded by the customer |
+| **Virtual network integration settings** | VNet/subnet configuration, private IPs |
+| **Managed identity configuration** | System-assigned and user-assigned identities |
+| **Azure Monitor diagnostic settings** | Log/metric export configurations |
+| **Protocols and cipher settings** | Custom TLS protocol and cipher configurations |
+| **Developer portal content** | Published portal customizations |
+| **Credential manager (authorizations)** | OAuth connections and authorization configurations |
+
+**Additional constraints:**
+- Backup expires after **30 days** — restore will fail after expiration
+- The **pricing tier must match** between source and target during restore
+- Avoid management changes while backup is in progress — changes may be excluded
+
+> 📖 Reference: [What is not backed up — Microsoft Docs](https://learn.microsoft.com/en-us/azure/api-management/api-management-howto-disaster-recovery-backup-restore?tabs=cli#what-is-not-backed-up)
+
+---
+
 > [Next: Subnet Migration →](04-SubnetMigration.md)
